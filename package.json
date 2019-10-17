@@ -5,9 +5,12 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "watch": "vue-cli-service build --watch --mode development"
   },
   "dependencies": {
+    "monaco-editor": "^0.18.1",
+    "monaco-editor-webpack-plugin": "^1.7.0",
+    "split.js": "^1.5.11",
     "vue": "^2.6.10"
   },
   "devDependencies": {
@@ -17,20 +20,6 @@
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.0.0",
     "vue-template-compiler": "^2.6.10"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended"
-    ],
-    "rules": {},
-    "parserOptions": {
-      "parser": "babel-eslint"
-    }
   },
   "postcss": {
     "plugins": {
