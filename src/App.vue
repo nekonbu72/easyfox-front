@@ -24,7 +24,8 @@
 //@ts-check
 
 import DirTree from "./components/DirTree.vue";
-import { walkDir, DirNode } from "./modules/walkDir";
+// import { walkDir, DirNode } from "./modules/walkDir";
+import { getDirTree, DirTree as Tree } from "./modules/http";
 import Split from "split.js";
 import * as monaco from "monaco-editor";
 import Path from "path";
@@ -38,7 +39,7 @@ export default {
     return {
       path: "C:\\easyfox_test",
       status: "Waiting...",
-      nodes: [new DirNode()],
+      nodes: [],
       /**
        * @type {monaco.editor.IStandaloneCodeEditor}
        */
@@ -99,18 +100,15 @@ export default {
         this.editor.layout();
       });
     },
-    updateDirTree() {
-      // タイマーをスタート
+    async updateDirTree() {
       const timer1 = new Date();
       this.status = "Loading...";
 
-      walkDir(this.url, this.ext).then(nodes => {
-        this.nodes = nodes;
+      const tree = await getDirTree();
+      this.nodes = tree.children;
 
-        // タイマーストップ
-        const timer2 = new Date();
-        this.status = `Done(${(timer2.getTime() - timer1.getTime()) / 1000}s).`;
-      });
+      const timer2 = new Date();
+      this.status = `Done(${(timer2.getTime() - timer1.getTime()) / 1000}s).`;
     },
     closeAllDetails() {
       const tree = this.$el.querySelector(".tree");

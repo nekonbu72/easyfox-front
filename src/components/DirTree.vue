@@ -2,7 +2,7 @@
   <ul>
     <li v-for="(directory, index) in directories" :key="`first-${index}`">
       <details>
-        <summary @click="updatePath(directory.localPath)" tabindex="0">{{ directory.filename }}</summary>
+        <summary @click="updatePath(directory.fullPath)" tabindex="0">{{ directory.name }}</summary>
         <DirTree @updatePath="updatePath" :nodes="directory.children" :editor="editor" />
       </details>
     </li>
@@ -11,12 +11,13 @@
       v-for="(file, index) in files"
       :key="`second-${index}`"
       @click="openFile(file)"
-    >{{ file.filename }}</li>
+    >{{ file.name }}</li>
   </ul>
 </template>
 
 <script>
-import { readFile, DirNode } from "../modules/walkDir";
+// import { readFile, DirNode } from "../modules/walkDir";
+import { getFile } from "../modules/http";
 
 export default {
   name: "DirTree",
@@ -28,12 +29,12 @@ export default {
   computed: {
     directories() {
       return this.nodes.filter(node => {
-        return node.isDirectory;
+        return node.isDir;
       });
     },
     files() {
       return this.nodes.filter(node => {
-        return !node.isDirectory;
+        return node.isFile;
       });
     }
   },
@@ -41,11 +42,10 @@ export default {
     /**
      * @param{DirNode}fileNode
      */
-    openFile(fileNode) {
-      readFile(fileNode.url).then(result => {
-        this.editor.setValue(result);
-        this.$emit("updatePath", fileNode.localPath);
-      });
+    async openFile(fileNode) {
+      const res = await getFile(fileNode);
+      this.editor.setValue(res);
+      this.$emit("updatePath", fileNode.fullPath);
     },
     /**
      * @param{string}newPath
