@@ -1,20 +1,23 @@
 <template>
   <div>
-    <form v-on:submit.prevent="updateDirTree">
-      <label>file:/</label>
-      <input class="path" type="text" v-model="path" required />
-      <input type="submit" value="->" />
-      <label>{{status}}</label>
-    </form>
-
-    <p></p>
-    <div class="wrapper">
+    <div class="header">
+      <form v-on:submit.prevent="updateDirTree">
+        <input class="path" type="text" v-model="path" required />
+        <input type="submit" value="->" />
+        <label>{{status}}</label>
+      </form>
+      <div class="buttonbar" v-show="isButtonBarShown">
+        <span>[Save]</span>
+        <span>[Exe]</span>
+      </div>
+    </div>
+    <div class="body">
       <div class="split" id="left">
         <span class="closer" tabindex="0" @click="closeAllDetails" @keyup="closeAllDetails">[-]</span>
         <DirTree @updatePath="updatePath" class="tree" :nodes="nodes" :editor="editor" />
       </div>
       <div class="split" id="right">
-        <div id="container"></div>
+        <div id="editor"></div>
       </div>
     </div>
   </div>
@@ -24,11 +27,9 @@
 //@ts-check
 
 import DirTree from "./components/DirTree.vue";
-// import { walkDir, DirNode } from "./modules/walkDir";
 import { getDirTree, DirTree as Tree } from "./modules/http";
 import Split from "split.js";
 import * as monaco from "monaco-editor";
-import Path from "path";
 
 export default {
   name: "app",
@@ -40,24 +41,24 @@ export default {
       path: "C:\\easyfox_test",
       status: "Waiting...",
       nodes: [],
-      /**
-       * @type {monaco.editor.IStandaloneCodeEditor}
-       */
-      editor: {}
+      editor: {},
+      isButtonBarShown: true
     };
   },
   computed: {
     ext() {
       return ["js", "txt", "iim"];
     },
-    url() {
-      return Path.join("file:", this.path);
-    },
     gutterMovedEventType() {
       return "gutterMoved";
+    },
+    minWidthButtonBarShown() {
+      return 700;
     }
   },
   mounted() {
+    this.initButtonBarHidden();
+
     this.initSplitter();
 
     this.initEditor();
@@ -65,6 +66,14 @@ export default {
     this.updateDirTree();
   },
   methods: {
+    initButtonBarHidden() {
+      window.addEventListener("resize", () => {
+        const header = this.$el.querySelector(".header");
+        this.isButtonBarShown =
+          header.clientWidth >= this.minWidthButtonBarShown;
+      });
+    },
+
     initSplitter() {
       const left = this.$el.querySelector("div#left"),
         right = this.$el.querySelector("div#right");
@@ -89,7 +98,7 @@ export default {
       });
     },
     initEditor() {
-      this.editor = monaco.editor.create(document.getElementById("container"), {
+      this.editor = monaco.editor.create(document.getElementById("editor"), {
         language: "javascript",
         minimap: { enabled: false }
       });
@@ -127,14 +136,44 @@ export default {
 </script>
 
 <style>
+:root {
+  --body-height: 90vh;
+}
+
+.header {
+  display: flex;
+}
+
+form {
+  flex: 1;
+  white-space: nowrap;
+}
+
 .path {
-  width: 60%;
+  width: 80%;
+}
+
+div.buttonbar {
+  display: flex;
+  width: fit-content;
+}
+
+.buttonbar span {
+  flex: 0 1 auto;
+  margin-left: 10vh;
+  margin-right: 10vh;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.body {
+  margin-top: 2vh;
 }
 
 div#left {
   overflow-x: scroll;
   overflow-y: scroll;
-  height: 90vh;
+  height: var(--body-height);
 }
 
 span.closer {
@@ -142,16 +181,16 @@ span.closer {
   background-color: lightgray;
 }
 
-#container {
+#editor {
   width: 100%;
-  height: 90vh;
+  height: var(--body-height);
   border: 1px solid #ccc;
 }
 
 .split,
 .gutter.gutter-horizontal {
   float: left;
-  height: 100vh;
+  height: var(--body-height);
 }
 
 .gutter.gutter-horizontal {

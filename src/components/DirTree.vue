@@ -16,7 +16,6 @@
 </template>
 
 <script>
-// import { readFile, DirNode } from "../modules/walkDir";
 import { getFile } from "../modules/http";
 
 export default {
@@ -34,7 +33,7 @@ export default {
     },
     files() {
       return this.nodes.filter(node => {
-        return node.isFile;
+        return node.isFile && node.isAllowedSuffix;
       });
     }
   },

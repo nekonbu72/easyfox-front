@@ -1,8 +1,6 @@
 //@ts-check
 "use strict";
 
-import Path from "path";
-
 const DIRTREE_URL = "http://127.0.0.1:5000/dirtree";
 const FILE_URL = "http://127.0.0.1:5000/file";
 
@@ -20,11 +18,22 @@ export const getDirTree = async () => {
  * @return {Promise<string>}
  */
 export const getFile = async path => {
-  const relative = path.fullPath.replace(path.top + "\\", "");
+  const resp = await fetch(`${FILE_URL}/${path.relative}`, {
+    mode: "cors"
+  });
+  return await resp.text();
+};
 
-  console.log(path.fullPath, path.top, relative);
-
-  const resp = await fetch(`${FILE_URL}/${relative}`, { mode: "cors" });
+/**
+ *
+ * @param {DirTree} path
+ * @return {Promise<string>}
+ */
+export const postFile = async path => {
+  const resp = await fetch(`${FILE_URL}/${path.relative}`, {
+    method: "POST",
+    mode: "cors"
+  });
   return await resp.text();
 };
 
@@ -79,6 +88,11 @@ export class DirTree {
      * @type {string}
      */
     this.top = "";
+
+    /**
+     * @type {string}
+     */
+    this.relative = "";
 
     /**
      * @type {boolean}
