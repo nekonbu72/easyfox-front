@@ -1,19 +1,19 @@
 <template>
   <div>
     <div class="header">
-      <form v-on:submit.prevent="updateDirTree">
-        <input class="path" type="text" v-model="path" required />
-        <input type="submit" value="->" />
-        <label>{{status}}</label>
-      </form>
-      <div class="buttonbar" v-show="isButtonBarShown">
-        <span>[Save]</span>
-        <span>[Exe]</span>
+      <div class="flex">
+        <input type="text" class="path" v-model="path" required />
+      </div>
+      <div class="solid" v-show="isbtnbarShown">
+        <input type="submit" class="btn update" @click="updateDirTree" value="->" />
+        <input type="submit" class="btn save" value="Save" />
+        <input type="submit" class="btn exe" value="Exe" />
+        <label class="status">{{status}}</label>
       </div>
     </div>
     <div class="body">
       <div class="split" id="left">
-        <span class="closer" tabindex="0" @click="closeAllDetails" @keyup="closeAllDetails">[-]</span>
+        <input type="submit" class="btn close" value="-" @click="closeAllDetails" />
         <DirTree @updatePath="updatePath" class="tree" :nodes="nodes" :editor="editor" />
       </div>
       <div class="split" id="right">
@@ -42,7 +42,7 @@ export default {
       status: "Waiting...",
       nodes: [],
       editor: {},
-      isButtonBarShown: true
+      isbtnbarShown: true
     };
   },
   computed: {
@@ -52,12 +52,12 @@ export default {
     gutterMovedEventType() {
       return "gutterMoved";
     },
-    minWidthButtonBarShown() {
+    minWidthbtnbarShown() {
       return 700;
     }
   },
   mounted() {
-    this.initButtonBarHidden();
+    this.initBtnBarHidden();
 
     this.initSplitter();
 
@@ -66,11 +66,10 @@ export default {
     this.updateDirTree();
   },
   methods: {
-    initButtonBarHidden() {
+    initBtnBarHidden() {
       window.addEventListener("resize", () => {
         const header = this.$el.querySelector(".header");
-        this.isButtonBarShown =
-          header.clientWidth >= this.minWidthButtonBarShown;
+        this.isbtnbarShown = header.clientWidth >= this.minWidthbtnbarShown;
       });
     },
 
@@ -79,7 +78,7 @@ export default {
         right = this.$el.querySelector("div#right");
 
       const split = Split([left, right], {
-        sizes: [25, 75],
+        // sizes: [25, 75],
         minSize: [100, 300],
         gutterSize: 3,
         onDragEnd: () => {
@@ -90,13 +89,17 @@ export default {
 
       let leftWidth = left.clientWidth;
       window.addEventListener("resize", () => {
-        const leftRatio = Math.round(
+        const leftRatio = Math.ceil(
           (leftWidth / (left.clientWidth + right.clientWidth)) * 100
         );
-        split.setSizes([leftRatio, 100 - leftRatio]);
+
+        // split.setSizes([leftRatio, 100 - leftRatio]);
         leftWidth = left.clientWidth;
+
+        console.log(`${leftRatio}%, ${left.clientWidth}, ${right.clientWidth}`);
       });
     },
+
     initEditor() {
       this.editor = monaco.editor.create(document.getElementById("editor"), {
         language: "javascript",
@@ -109,6 +112,7 @@ export default {
         this.editor.layout();
       });
     },
+
     async updateDirTree() {
       const timer1 = new Date();
       this.status = "Loading...";
@@ -119,6 +123,7 @@ export default {
       const timer2 = new Date();
       this.status = `Done(${(timer2.getTime() - timer1.getTime()) / 1000}s).`;
     },
+
     closeAllDetails() {
       const tree = this.$el.querySelector(".tree");
       tree
@@ -138,32 +143,35 @@ export default {
 <style>
 :root {
   --body-height: 90vh;
+  --header-height: 8vh;
 }
 
 .header {
   display: flex;
+  height: var(--header-height);
 }
 
-form {
+div.flex {
   flex: 1;
   white-space: nowrap;
 }
 
-.path {
-  width: 80%;
+div.flex .path {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-div.buttonbar {
+div.solid {
   display: flex;
   width: fit-content;
 }
 
-.buttonbar span {
+div.solid * {
   flex: 0 1 auto;
-  margin-left: 10vh;
-  margin-right: 10vh;
-  margin-top: auto;
-  margin-bottom: auto;
+  margin: 0 1vh;
+  padding: 0 2vh;
 }
 
 .body {
@@ -176,9 +184,9 @@ div#left {
   height: var(--body-height);
 }
 
-span.closer {
-  cursor: pointer;
-  background-color: lightgray;
+.btn.close {
+  height: var(--header-height);
+  width: var(--header-height);
 }
 
 #editor {
@@ -187,9 +195,16 @@ span.closer {
   border: 1px solid #ccc;
 }
 
+.body {
+  display: flex;
+}
+
+.body .rigth {
+  flex: 1;
+}
+
 .split,
 .gutter.gutter-horizontal {
-  float: left;
   height: var(--body-height);
 }
 
