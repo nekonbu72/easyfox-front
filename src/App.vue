@@ -1,10 +1,10 @@
 <template>
   <div>
     <div class="header">
-      <div class="flex">
-        <input type="text" class="path" v-model="path" required />
+      <div class="header item flex">
+        <input type="text" class="path" v-model="path" required readonly />
       </div>
-      <div class="solid" v-show="isbtnbarShown">
+      <div class="header item solid" v-show="isHeaderSolidShown">
         <input type="submit" class="btn update" @click="updateDirTree" value="->" />
         <input type="submit" class="btn save" value="Save" />
         <input type="submit" class="btn exe" value="Exe" />
@@ -12,11 +12,18 @@
       </div>
     </div>
     <div class="body">
-      <div class="split" id="left">
+      <div class="body item solid" @dragover="handleDragOver" v-show="isBodySolidShown">
         <input type="submit" class="btn close" value="-" @click="closeAllDetails" />
-        <DirTree @updatePath="updatePath" class="tree" :nodes="nodes" :editor="editor" />
+        <DirTree @updatePath="updatePath" class="tree" :trees="trees" :editor="editor" />
       </div>
-      <div class="split" id="right">
+      <div
+        class="gutter"
+        draggable="true"
+        @dragstart="handleGutterDragStart"
+        @dragend="handleGutterDragEnd"
+        v-show="isBodySolidShown"
+      ></div>
+      <div class="body item flex" @dragover="handleDragOver">
         <div id="editor"></div>
       </div>
     </div>
@@ -24,11 +31,8 @@
 </template>
 
 <script>
-//@ts-check
-
 import DirTree from "./components/DirTree.vue";
 import { getDirTree, DirTree as Tree } from "./modules/http";
-import Split from "split.js";
 import * as monaco from "monaco-editor";
 
 export default {
@@ -40,64 +44,92 @@ export default {
     return {
       path: "C:\\easyfox_test",
       status: "Waiting...",
-      nodes: [],
+
+      /**
+       * @type {Tree[]}
+       */
+      trees: [],
+
+      /**
+       * @type {monaco.editor.IStandaloneCodeEditor}
+       */
       editor: {},
-      isbtnbarShown: true
+
+      isHeaderSolidShown: true,
+      isBodySolidShown: true,
+
+      /**
+       * @type {HTMLDivElement}
+       */
+      bodySolid: {},
+
+      beforeClientX: -1,
+      afterClientX: -1
     };
   },
   computed: {
-    ext() {
-      return ["js", "txt", "iim"];
-    },
-    gutterMovedEventType() {
-      return "gutterMoved";
-    },
-    minWidthbtnbarShown() {
+    minSolidWidth() {
       return 700;
     }
   },
   mounted() {
-    this.initBtnBarHidden();
-
-    this.initSplitter();
-
+    this.initHeaderSolidShown();
+    this.initBodySolid();
+    this.initBodySolidShown();
     this.initEditor();
-
     this.updateDirTree();
   },
   methods: {
-    initBtnBarHidden() {
+    initHeaderSolidShown() {
       window.addEventListener("resize", () => {
         const header = this.$el.querySelector(".header");
-        this.isbtnbarShown = header.clientWidth >= this.minWidthbtnbarShown;
+        this.isHeaderSolidShown = header.clientWidth >= this.minSolidWidth;
       });
     },
 
-    initSplitter() {
-      const left = this.$el.querySelector("div#left"),
-        right = this.$el.querySelector("div#right");
+    initBodySolid() {
+      this.bodySolid = this.$el.querySelector(".body.item.solid");
+    },
 
-      const split = Split([left, right], {
-        // sizes: [25, 75],
-        minSize: [100, 300],
-        gutterSize: 3,
-        onDragEnd: () => {
-          leftWidth = left.clientWidth;
-          this.$el.dispatchEvent(new Event(this.gutterMovedEventType));
+    initBodySolidShown() {
+      window.addEventListener("resize", () => {
+        const body = this.$el.querySelector(".body");
+        const beforeIsBodySolidShown = this.isBodySolidShown;
+        this.isBodySolidShown = body.clientWidth >= this.minSolidWidth;
+        if (this.isBodySolidShown !== beforeIsBodySolidShown) {
+          //
+          this.editor.layout();
         }
       });
+    },
 
-      let leftWidth = left.clientWidth;
-      window.addEventListener("resize", () => {
-        const leftRatio = Math.ceil(
-          (leftWidth / (left.clientWidth + right.clientWidth)) * 100
-        );
+    /**
+     * @param {DragEvent} event
+     */
+    handleGutterDragStart(event) {
+      // Firefox52 では setData しないと drag イベントが発生しない
+      event.dataTransfer.setData("text/plain", "");
+      this.beforeClientX = event.clientX;
+    },
 
-        // split.setSizes([leftRatio, 100 - leftRatio]);
-        leftWidth = left.clientWidth;
-
-        console.log(`${leftRatio}%, ${left.clientWidth}, ${right.clientWidth}`);
-      });
+    handleGutterDragEnd() {
+      const moveX = this.afterClientX - this.beforeClientX;
+      const style = window.getComputedStyle(this.bodySolid);
+      const widthPx = style.getPropertyValue("width");
+      const width = parseFloat(widthPx);
+      this.bodySolid.style.width = `${width + moveX}px`;
+      this.beforeClientX = this.afterClientX;
+      //
+      this.editor.layout();
+    },
+    /**
+     * @param {DragEvent} event
+     */
+    handleDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      // dragend イベントでは clientX を取得できないため dragover で取得
+      this.afterClientX = event.clientX;
     },
 
     initEditor() {
@@ -108,28 +140,27 @@ export default {
       window.addEventListener("resize", () => {
         this.editor.layout();
       });
-      this.$el.addEventListener(this.gutterMovedEventType, () => {
-        this.editor.layout();
-      });
     },
 
     async updateDirTree() {
-      const timer1 = new Date();
+      const timerStart = new Date();
       this.status = "Loading...";
 
       const tree = await getDirTree();
-      this.nodes = tree.children;
+      this.trees = tree.children;
 
-      const timer2 = new Date();
-      this.status = `Done(${(timer2.getTime() - timer1.getTime()) / 1000}s).`;
+      const timerEnd = new Date();
+      const timeGap = timerEnd.getTime() - timerStart.getTime();
+      this.status = `Done(${timeGap / 1000}s).`;
     },
 
     closeAllDetails() {
-      const tree = this.$el.querySelector(".tree");
+      const tree = this.$el.querySelector("tree");
       tree
         .querySelectorAll("details")
         .forEach(details => (details.open = false));
     },
+
     /**
      * @param{string}newPath
      */
@@ -140,77 +171,70 @@ export default {
 };
 </script>
 
-<style>
-:root {
-  --body-height: 90vh;
-  --header-height: 8vh;
-}
-
+<style scoped>
 .header {
   display: flex;
-  height: var(--header-height);
+  height: 34px;
 }
 
-div.flex {
+.header.item.flex {
   flex: 1;
   white-space: nowrap;
 }
 
-div.flex .path {
+.header.item.flex .path {
   width: 100%;
-  height: 100%;
   padding: 0;
   box-sizing: border-box;
 }
 
-div.solid {
+.header.item.solid {
   display: flex;
   width: fit-content;
 }
 
-div.solid * {
+.header.item.solid * {
   flex: 0 1 auto;
   margin: 0 1vh;
   padding: 0 2vh;
 }
 
 .body {
+  display: flex;
+  height: 85vh;
   margin-top: 2vh;
 }
 
-div#left {
-  overflow-x: scroll;
+.body.item {
+  white-space: nowrap;
+  margin: 0;
+}
+
+.body.item.solid {
+  width: 50vh;
   overflow-y: scroll;
-  height: var(--body-height);
+  overflow-x: hidden;
+  display: block;
 }
 
 .btn.close {
-  height: var(--header-height);
-  width: var(--header-height);
+  height: 34px;
+  width: 34px;
+}
+
+.body .gutter {
+  width: 5px;
+  background-color: #ccc;
+  cursor: ew-resize;
+}
+
+.body.item.flex {
+  flex: 1;
+  overflow-x: scroll;
 }
 
 #editor {
-  width: 100%;
-  height: var(--body-height);
+  width: calc(100% - 2px);
   border: 1px solid #ccc;
-}
-
-.body {
-  display: flex;
-}
-
-.body .rigth {
-  flex: 1;
-}
-
-.split,
-.gutter.gutter-horizontal {
-  height: var(--body-height);
-}
-
-.gutter.gutter-horizontal {
-  cursor: col-resize;
-  background-color: gray;
-  width: 5px;
 }
 </style>
