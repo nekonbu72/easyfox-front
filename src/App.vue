@@ -33,7 +33,7 @@
 <script>
 import DirTree from "./components/DirTree.vue";
 import { getDirTree, DirTree as Tree } from "./modules/http";
-import * as monaco from "monaco-editor";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 export default {
   name: "app",

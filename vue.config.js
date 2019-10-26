@@ -11,6 +11,11 @@ module.exports = {
       config.devtool = "source-map";
     }
 
-    config.plugins.push(new MonacoWebpackPlugin());
+    config.plugins.push(
+      new MonacoWebpackPlugin({
+        languages: ["typescript", "javascript"],
+        features: []
+      })
+    );
   }
 };

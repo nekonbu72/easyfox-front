@@ -9,8 +9,6 @@
   },
   "dependencies": {
     "monaco-editor": "^0.18.1",
-    "monaco-editor-webpack-plugin": "^1.7.0",
-    "split.js": "^1.5.11",
     "vue": "^2.6.10"
   },
   "devDependencies": {
@@ -19,6 +17,7 @@
     "babel-eslint": "^10.0.1",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.0.0",
+    "monaco-editor-webpack-plugin": "^1.7.0",
     "vue-template-compiler": "^2.6.10"
   },
   "postcss": {
