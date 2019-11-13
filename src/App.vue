@@ -7,7 +7,13 @@
       <div class="header item solid" v-show="isHeaderSolidShown">
         <input type="submit" class="btn update" @click="updateDirTree" value="->" />
         <input type="submit" class="btn save" value="Save" />
-        <input type="submit" class="btn exe" value="Exe" />
+        <input
+          type="submit"
+          class="btn exe"
+          @click="executeScript"
+          value="Exe"
+          v-bind:disabled="!isExeEnabled"
+        />
         <label class="status">{{status}}</label>
       </div>
     </div>
@@ -32,7 +38,7 @@
 
 <script>
 import DirTree from "./components/DirTree.vue";
-import { getDirTree, DirTree as Tree } from "./modules/http";
+import { getDirTree, postExe, DirTree as Tree } from "./modules/http";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 export default {
@@ -42,7 +48,7 @@ export default {
   },
   data() {
     return {
-      path: "C:\\easyfox_test",
+      path: "",
       status: "Waiting...",
 
       /**
@@ -64,7 +70,9 @@ export default {
       bodySolid: {},
 
       beforeClientX: -1,
-      afterClientX: -1
+      afterClientX: -1,
+
+      isExeEnabled: false
     };
   },
   computed: {
@@ -134,11 +142,16 @@ export default {
 
     initEditor() {
       this.editor = monaco.editor.create(document.getElementById("editor"), {
-        language: "javascript",
+        language: "python",
         minimap: { enabled: false }
       });
       window.addEventListener("resize", () => {
         this.editor.layout();
+      });
+      this.editor.getModel().onDidChangeContent(() => {
+        if (this.editor.getValue() !== "") {
+          this.isExeEnabled = true;
+        }
       });
     },
 
@@ -147,6 +160,7 @@ export default {
       this.status = "Loading...";
 
       const tree = await getDirTree();
+      this.path = tree.fullPath;
       this.trees = tree.children;
 
       const timerEnd = new Date();
@@ -166,6 +180,12 @@ export default {
      */
     updatePath(newPath) {
       this.path = newPath;
+    },
+
+    async executeScript() {
+      const script = this.editor.getValue();
+      const result = await postExe(script);
+      console.log(result);
     }
   }
 };
