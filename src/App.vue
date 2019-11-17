@@ -2,25 +2,40 @@
   <div>
     <div class="header">
       <div class="header item flex">
-        <input type="text" class="path" v-model="path" required readonly />
+        <input type="text" class="path" v-model="this.path" required readonly />
       </div>
       <div class="header item solid" v-show="isHeaderSolidShown">
-        <input type="submit" class="btn update" @click="updateDirTree" value="->" />
-        <input type="submit" class="btn save" value="Save" />
+        <input type="submit" class="btn reload" @click="loadDirTree" value="Reload" />
+        <input type="submit" class="btn save" @click="save" :disabled="!isSaveEnabled" value="Save" />
+        <input
+          type="submit"
+          class="btn new"
+          @click="newUnsavedFile"
+          :disabled="!isNewEnabled"
+          value="new"
+        />
+        <input
+          type="submit"
+          class="btn delete"
+          @click="delete_"
+          :disabled="!isDeleteEnabled"
+          value="Delete"
+        />
+        <input type="submit" class="btn rename" value="Rename" />
         <input
           type="submit"
           class="btn exe"
           @click="executeScript"
+          :disabled="!isExeEnabled"
           value="Exe"
-          v-bind:disabled="!isExeEnabled"
         />
-        <label class="status">{{status}}</label>
+        <label class="status">{{ status }}</label>
       </div>
     </div>
     <div class="body">
       <div class="body item solid" @dragover="handleDragOver" v-show="isBodySolidShown">
-        <input type="submit" class="btn close" value="-" @click="closeAllDetails" />
-        <DirTree @updatePath="updatePath" class="tree" :trees="trees" :editor="editor" />
+        <input type="submit" class="btn close" @click="closeAllDetails" value="-" />
+        <DirTree class="tree" @select="select" :tree="tree" />
       </div>
       <div
         class="gutter"
@@ -38,7 +53,14 @@
 
 <script>
 import DirTree from "./components/DirTree.vue";
-import { getDirTree, postExe, DirTree as Tree } from "./modules/http";
+import {
+  getDirTree,
+  getText,
+  overwrite,
+  delete_ as httpDelete,
+  postExe
+} from "./modules/http";
+import { DirTree as Tree } from "./modules/dirtree";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
 export default {
@@ -48,18 +70,22 @@ export default {
   },
   data() {
     return {
-      path: "",
       status: "Waiting...",
 
       /**
-       * @type {Tree[]}
+       * @type {Tree}
        */
-      trees: [],
+      tree: {},
 
       /**
        * @type {monaco.editor.IStandaloneCodeEditor}
        */
       editor: {},
+
+      /**
+       * @type {string}
+       */
+      lastSavedText: "",
 
       isHeaderSolidShown: true,
       isBodySolidShown: true,
@@ -70,14 +96,51 @@ export default {
       bodySolid: {},
 
       beforeClientX: -1,
-      afterClientX: -1,
-
-      isExeEnabled: false
+      afterClientX: -1
     };
   },
   computed: {
     minSolidWidth() {
       return 700;
+    },
+
+    path() {
+      if (!this.tree.selected) {
+        return "";
+      }
+
+      const selected = this.tree.selected();
+      if (!selected) {
+        console.log("selected is empty");
+        return "";
+      }
+
+      return selected.fullPath;
+    },
+
+    isNewEnabled() {
+      if (!this.tree.selected) {
+        return false;
+      }
+      return this.tree.selected() !== null && !this.tree.hasGhost();
+    },
+
+    isSaveEnabled() {
+      if (!this.tree.opened) {
+        return false;
+      }
+      return this.tree.opened() !== null;
+    },
+
+    isDeleteEnabled() {
+      return this.isSaveEnabled;
+    },
+
+    isExeEnabled() {
+      if (!this.editor.getValue) {
+        return false;
+      }
+      return this.editor.getValue().trim() !== "";
     }
   },
   mounted() {
@@ -85,7 +148,7 @@ export default {
     this.initBodySolid();
     this.initBodySolidShown();
     this.initEditor();
-    this.updateDirTree();
+    this.loadDirTree();
   },
   methods: {
     initHeaderSolidShown() {
@@ -149,19 +212,18 @@ export default {
         this.editor.layout();
       });
       this.editor.getModel().onDidChangeContent(() => {
-        if (this.editor.getValue() !== "") {
-          this.isExeEnabled = true;
-        }
+        this.updateOpenedFileIsSaved();
       });
     },
 
-    async updateDirTree() {
+    async loadDirTree() {
       const timerStart = new Date();
       this.status = "Loading...";
 
-      const tree = await getDirTree();
-      this.path = tree.fullPath;
-      this.trees = tree.children;
+      this.tree = await getDirTree();
+      this.close();
+      this.tree.select(this.tree);
+      this.tree.isDetailsOpened = true;
 
       const timerEnd = new Date();
       const timeGap = timerEnd.getTime() - timerStart.getTime();
@@ -169,17 +231,141 @@ export default {
     },
 
     closeAllDetails() {
-      const tree = this.$el.querySelector("tree");
+      const tree = this.$el.querySelector(".tree");
       tree
         .querySelectorAll("details")
         .forEach(details => (details.open = false));
     },
 
     /**
-     * @param{string}newPath
+     * @param{Tree}item
      */
-    updatePath(newPath) {
-      this.path = newPath;
+    select(item) {
+      if (item.isFile) {
+        this.selectFile(item);
+        return;
+      }
+      this.tree.select(item);
+    },
+
+    /**
+     * @param{Tree}file
+     */
+    selectFile(file) {
+      const opened = this.tree.opened();
+      if (opened) {
+        if (opened === file) {
+          console.log("already opened file");
+          return;
+        }
+        if (!opened.isSaved) {
+          if (
+            !confirm(
+              `Are you sure to discard unsaved changes on [${opened.name}]?`
+            )
+          ) {
+            console.log("open canceled");
+            return;
+          }
+        }
+        if (!opened.exists) {
+          this.tree.delete(opened);
+        }
+      }
+
+      this.tree.open(file);
+      if (!file.exists) {
+        console.log("ghost: ", file.name);
+        return;
+      }
+      this.open(file);
+    },
+
+    /**
+     * @param{Tree}newfile
+     */
+    async open(newFile) {
+      const text = await getText(newFile);
+      this.lastSavedText = text;
+
+      // updateOpenedFileIsSaved が発火
+      this.editor.setValue(text);
+    },
+
+    /**
+     * open せずに閉じるだけの時に使う
+     */
+    close() {
+      this.tree.unselectAll();
+      this.tree.closeAll();
+      this.lastSavedText = "";
+      this.editor.setValue("");
+    },
+
+    updateOpenedFileIsSaved() {
+      const opened = this.tree.opened();
+      if (opened) {
+        const currentText = this.editor.getValue();
+        opened.isSaved = currentText === this.lastSavedText;
+      }
+    },
+
+    /**
+     * @param{string}name
+     */
+    newUnsavedFile() {
+      const selected = this.tree.selected();
+      const tgtDir = selected.isDir ? selected : selected.parentTree;
+
+      const ghost = new Tree();
+      ghost.isSaved = false;
+      ghost.isAllowedSuffix = true;
+      ghost.isFile = true;
+      ghost.name = "untitled";
+      ghost.fullPath = `${tgtDir.fullPath}\\${ghost.name}`;
+      ghost.top = tgtDir.top;
+      ghost.parentTree = tgtDir;
+      ghost.relative = ghost.fullPath.replace(ghost.top, "").slice(1);
+
+      tgtDir.children.push(ghost);
+      tgtDir.isDetailsOpened = true;
+      this.select(ghost);
+    },
+
+    async save() {
+      const tgtFile = this.tree.opened();
+      const orgRelative = tgtFile.relative;
+      if (!tgtFile.exists) {
+        const name = prompt("Name?", tgtFile.name);
+        const re = new RegExp(`${tgtFile.name}$`);
+        tgtFile.relative = tgtFile.relative.replace(re, name);
+      }
+
+      const newText = this.editor.getValue();
+      const resp = await overwrite(tgtFile, newText);
+      if (newText.length.toString() === resp) {
+        await this.loadDirTree();
+        await this.open(tgtFile);
+      } else {
+        alert("save failed");
+        tgtFile.relative = orgRelative;
+      }
+    },
+
+    async delete_() {
+      const tgtFile = this.tree.opened();
+
+      if (tgtFile.exists) {
+        const resp = await httpDelete(tgtFile);
+        if (resp !== "ok") {
+          alert("delete failed");
+          return;
+        }
+      }
+
+      this.tree.delete(tgtFile);
+      // 一瞬 path = "" になる this.tree.selected() === null のため
+      this.loadDirTree();
     },
 
     async executeScript() {

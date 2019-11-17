@@ -1,6 +1,8 @@
 //@ts-check
 "use strict";
 
+import { DirTree } from "./dirtree";
+
 const DIRTREE_URL = "http://127.0.0.1:5000/dirtree";
 const FILE_URL = "http://127.0.0.1:5000/file";
 const EXE_URL = "http://127.0.0.1:5000/exe";
@@ -10,16 +12,19 @@ const EXE_URL = "http://127.0.0.1:5000/exe";
  */
 export const getDirTree = async () => {
   const resp = await fetch(DIRTREE_URL, { mode: "cors" });
-  return await resp.json();
+  const json = await resp.json();
+  // const dirTree = new DirTree();
+  // Object.assign(dirTree, json);
+  return DirTree.from(json);
 };
 
 /**
  *
- * @param {DirTree} path
+ * @param {DirTree} file
  * @return {Promise<string>}
  */
-export const getFile = async path => {
-  const resp = await fetch(`${FILE_URL}/${path.relative}`, {
+export const getText = async file => {
+  const resp = await fetch(`${FILE_URL}/${file.relative}`, {
     mode: "cors"
   });
   return await resp.text();
@@ -27,18 +32,31 @@ export const getFile = async path => {
 
 /**
  *
- * @param {DirTree} path
+ * @param {DirTree} file
  * @param {string} text
  * @return {Promise<string>}
  */
-export const postFile = async (path, text) => {
-  const resp = await fetch(`${FILE_URL}/${path.relative}`, {
-    method: "POST",
+export const overwrite = async (file, text) => {
+  const resp = await fetch(`${FILE_URL}/${file.relative}`, {
+    method: "PUT",
     mode: "cors",
     body: text,
     headers: {
       "Content-Type": "text/plain"
     }
+  });
+  return await resp.text();
+};
+
+/**
+ *
+ * @param {DirTree} file
+ * @return {Promise<string>}
+ */
+export const delete_ = async file => {
+  const resp = await fetch(`${FILE_URL}/${file.relative}`, {
+    method: "DELETE",
+    mode: "cors"
   });
   return await resp.text();
 };
@@ -59,82 +77,3 @@ export const postExe = async script => {
   });
   return await resp.text();
 };
-
-export class DirTree {
-  constructor() {
-    /**
-     * @type {boolean}
-     */
-    this.exists = false;
-
-    /**
-     * @type {string}
-     */
-    this.parent = "";
-
-    /**
-     * @type {string}
-     */
-    this.name = "";
-
-    /**
-     * @type {string}
-     */
-    this.stem = "";
-
-    /**
-     * @type {string}
-     */
-    this.suffix = "";
-
-    /**
-     * @type {string}
-     */
-    this.fullPath = "";
-
-    /**
-     * @type {boolean}
-     */
-    this.isDir = false;
-
-    /**
-     * @type {boolean}
-     */
-    this.isFile = false;
-
-    /**
-     * @type {number}
-     */
-    this.depth = 0;
-
-    /**
-     * @type {string}
-     */
-    this.top = "";
-
-    /**
-     * @type {string}
-     */
-    this.relative = "";
-
-    /**
-     * @type {boolean}
-     */
-    this.hasChildren = false;
-
-    /**
-     * @type {number}
-     */
-    this.countChildren = 0;
-
-    /**
-     * @type {DirTree[]}
-     */
-    this.children = [];
-
-    /**
-     * @type {boolean}
-     */
-    this.isAllowedSuffix = false;
-  }
-}
